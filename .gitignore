@@ -22,6 +22,7 @@ wheels/
 
 # 虚拟环境
 venv/
+env/
 ENV/
 
 # IDE
@@ -30,14 +31,20 @@ ENV/
 *.swp
 *.swo
 
-# 项目特定
-data/sen12ms/
-logs/
+# 数据集
+data/eurosat/
+data/landsat/
+
+# 模型检查点
 checkpoints/
 *.pth
 *.pt
 *.ckpt
 
-# 系统
+# 日志
+logs/
+*.log
+
+# 系统文件
 .DS_Store
 Thumbs.db 

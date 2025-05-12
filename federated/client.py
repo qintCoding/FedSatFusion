@@ -2,6 +2,8 @@ import torch
 from torch.utils.data import DataLoader
 import random
 import numpy as np
+import torch.nn as nn
+import torch.optim as optim
 
 class SatelliteClient:
     def __init__(self, client_id, dataset, model, device, batch_size=16, num_workers=2,
@@ -47,51 +49,48 @@ class SatelliteClient:
         # 负载增加
         self.load = min(self.max_load, self.load + self.load_increase_rate)
         
-    def local_train(self, criterion, optimizer, epochs=1, energy_threshold=0.2, gamma=0.1, beta=0.1):
-        # 能量安全约束
-        if self.energy < energy_threshold:
-            print(f"[Client {self.client_id}] 能量不足，跳过本轮本地训练 (energy={self.energy:.3f})")
-            return
-            
+    def local_train(self, epochs=1):
+        """本地训练模型"""
         self.model.train()
-        self.model.to(self.device)
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(self.model.parameters(), lr=0.001)
         
         for epoch in range(epochs):
-            for batch_idx, batch in enumerate(self.dataloader):
-                # 检查资源是否足够
-                if self.energy < energy_threshold:
-                    print(f"[Client {self.client_id}] 训练过程中能量不足，停止训练 (energy={self.energy:.3f})")
-                    break
-                    
-                s1_data = batch['sar'].to(self.device)
-                s2_data = batch['optical'].to(self.device)
+            total_loss = 0
+            correct = 0
+            total = 0
+            
+            for batch in self.dataloader:
+                # 获取数据
+                s1_data = batch['optical'].to(self.device)  # 使用光学数据作为SAR数据
+                s2_data = batch['thermal'].to(self.device)  # 使用热红外数据作为光学数据
                 labels = batch['label'].to(self.device)
-                labels = labels - 1  # 标签归一化
-                labels = labels.view(-1)
                 
+                # 前向传播
                 optimizer.zero_grad()
                 outputs = self.model(s1_data, s2_data)
-                outputs = outputs.unsqueeze(1).unsqueeze(1)
-                outputs = outputs.expand(-1, 256, 256, -1)
-                outputs = outputs.reshape(-1, outputs.size(-1))
+                loss = criterion(outputs, labels)
                 
-                task_loss = criterion(outputs, labels)
-                
-                # 多目标损失：任务损失 + 负载正则 + 能量正则
-                load_reg = gamma * self.load
-                energy_reg = beta * (1.0 - self.energy)  # 能量越低惩罚越大
-                loss = task_loss + load_reg + energy_reg
-                
+                # 反向传播
                 loss.backward()
                 optimizer.step()
                 
-                # 更新资源状态
-                self._update_resources()
-                
-                if batch_idx % 5 == 0:
-                    print(f"[Client {self.client_id}] Epoch {epoch} Batch {batch_idx} Loss: {loss.item():.4f} "
-                          f"Energy: {self.energy:.3f} Load: {self.load:.3f}")
-                          
+                # 统计
+                total_loss += loss.item()
+                _, predicted = outputs.max(1)
+                total += labels.size(0)
+                correct += predicted.eq(labels).sum().item()
+            
+            # 计算准确率
+            accuracy = 100. * correct / total
+            avg_loss = total_loss / len(self.dataloader)
+            
+            print(f'Client {self.client_id} - Epoch {epoch+1}/{epochs}: '
+                  f'Loss: {avg_loss:.4f}, Accuracy: {accuracy:.2f}%')
+            
+            # 更新资源状态
+            self._update_resources()
+            
     def update_dynamic_state(self, energy=None, compute=None, load=None):
         """更新动态状态"""
         if energy is not None:

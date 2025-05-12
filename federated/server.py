@@ -3,25 +3,31 @@ import torch
 import numpy as np
 from .environment import SatelliteEnvironment
 from .drl_agent import DRLAgent
+import torch.nn as nn
+import torch.optim as optim
 
 class FederatedServer:
-    def __init__(self, global_model, device, num_satellites=3):
-        self.global_model = global_model
+    def __init__(self, model, device, num_clients=3, local_epochs=5, global_epochs=10):
+        self.global_model = model
         self.device = device
         self.clients = []
         self.leader_id = None
         self.leader_score = None
         self.delta = 0.9  # 衰减因子
         
+        # 训练参数
+        self.local_epochs = local_epochs
+        self.global_epochs = global_epochs
+        
         # 初始化环境和DRL代理
-        self.env = SatelliteEnvironment(num_satellites)
+        self.env = SatelliteEnvironment(num_clients)
         self.drl_agent = DRLAgent(
             state_dim=self.env.state_dim,
             action_dim=self.env.action_dim,
             device=device
         )
         
-        # 训练参数
+        # DRL训练参数
         self.drl_episodes = 100
         self.drl_steps = 100
         
@@ -112,7 +118,7 @@ class FederatedServer:
                 'transmit_power': actions[i, 2]
             })
             
-    def federated_round(self):
+    def federated_round(self, dataset, batch_size, num_workers):
         """执行一轮联邦学习，包含资源优化"""
         # 1. 使用DRL优化资源分配
         self.optimize_resources()
@@ -122,8 +128,8 @@ class FederatedServer:
         
         # 3. 客户端本地训练
         for client in self.clients:
-            client.local_train()
-            
+            client.local_train(epochs=self.local_epochs)
+        
         # 4. 聚合参数
         self.aggregate_params()
         

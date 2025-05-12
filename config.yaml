@@ -1,18 +1,19 @@
 # 数据配置
 data:
-  data_dir: "data/sen12ms"  # 改回正确的数据集路径
-  batch_size: 32
-  num_workers: 4
+  data_dir: "data/eurosat/EuroSAT"  # EuroSAT数据集路径
 
 # 模型配置
 model:
-  num_classes: 17
+  num_classes: 10  # EuroSAT类别数
   input_channels:
-    sar: 2  # VV和VH通道
-    optical: 13  # 所有光学波段
+    optical: 3  # RGB
+    thermal: 3  # 使用RGB作为热红外
+  feature_dim: 256  # 特征维度
 
 # 训练配置
 training:
+  batch_size: 32
+  num_workers: 4
   epochs: 100
   learning_rate: 0.001
   early_stopping_patience: 10
@@ -27,4 +28,13 @@ scheduler:
   type: "reduce_on_plateau"
   patience: 5
   factor: 0.5
-  min_lr: 0.00001 
+  min_lr: 0.00001
+
+# 联邦学习配置
+federated:
+  num_clients: 3
+  local_epochs: 5
+  global_rounds: 10
+  energy_threshold: 0.2
+  gamma: 0.1
+  beta: 0.1 
