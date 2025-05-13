@@ -20,7 +20,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# 虚拟环境
+# Virtual Environment
 venv/
 env/
 ENV/
@@ -31,20 +31,20 @@ ENV/
 *.swp
 *.swo
 
-# 数据集
+# Dataset
 data/eurosat/
 data/landsat/
 
-# 模型检查点
+# Checkpoints
 checkpoints/
 *.pth
 *.pt
 *.ckpt
 
-# 日志
+# Logs
 logs/
 *.log
 
-# 系统文件
+# System Files
 .DS_Store
 Thumbs.db 
