@@ -123,18 +123,58 @@ class FederatedServer:
         # 1. 使用DRL优化资源分配
         self.optimize_resources()
         
+        # 显示卫星状态
+        print("\n当前卫星状态:")
+        for i, client in enumerate(self.clients):
+            state = client.get_resource_state()
+            print(f"卫星 {i}: 能量={state['energy']:.2f}, 计算资源={state['compute']:.2f}, 负载={state['load']:.2f}")
+        
         # 2. 分发全局参数
         self.distribute_global_params()
         
         # 3. 客户端本地训练
+        total_compute_cost = 0
+        total_comm_cost = 0
         for client in self.clients:
+            # 记录训练前的资源状态
+            before_state = client.get_resource_state()
+            
+            # 执行训练
             client.local_train(epochs=self.local_epochs)
+            
+            # 计算开销
+            after_state = client.get_resource_state()
+            compute_cost = before_state['compute'] - after_state['compute']
+            comm_cost = before_state['energy'] - after_state['energy'] - compute_cost
+            total_compute_cost += compute_cost
+            total_comm_cost += comm_cost
+            
+            print(f"卫星 {client.client_id} 开销: 计算={compute_cost:.4f}, 通信={comm_cost:.4f}")
         
         # 4. 聚合参数
+        print("\n开始参数聚合...")
+        # 选择聚合卫星
+        leader_id = self.elect_leader()
+        print(f"本轮聚合卫星: 卫星 {leader_id}")
+        
+        # 显示聚合前的参数差异
+        print("聚合前参数差异:")
+        for i, client in enumerate(self.clients):
+            if i != leader_id:
+                params_diff = torch.mean(torch.stack([
+                    torch.abs(client.get_model_params()[k] - self.clients[leader_id].get_model_params()[k])
+                    for k in client.get_model_params().keys()
+                ]))
+                print(f"卫星 {i} 与聚合卫星的参数差异: {params_diff:.4f}")
+        
+        # 执行聚合
         self.aggregate_params()
         
         # 5. 更新环境状态
         self.env.step(np.zeros((len(self.clients), self.env.action_dim)))
+        
+        # 显示本轮总开销
+        print(f"\n本轮总开销: 计算={total_compute_cost:.4f}, 通信={total_comm_cost:.4f}")
 
     def elect_leader(self):
         scores = [self.score_client(c) for c in self.clients]
