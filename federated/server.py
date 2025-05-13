@@ -170,7 +170,11 @@ class FederatedServer:
         # 执行聚合
         self.aggregate_params()
         
-        # 5. 更新环境状态
+        # 5. 重新分发聚合后的参数
+        print("\n重新分发聚合后的参数...")
+        self.distribute_global_params()
+        
+        # 6. 更新环境状态
         self.env.step(np.zeros((len(self.clients), self.env.action_dim)))
         
         # 显示本轮总开销
